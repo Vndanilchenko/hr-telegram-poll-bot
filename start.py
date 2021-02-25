@@ -7,6 +7,7 @@
 
 
 import telebot, os
+import logging
 
 # импортируем токены
 try:
@@ -15,6 +16,10 @@ except:
     from private.token import token
 
 bot = telebot.TeleBot(token=token)
+
+# добавим логирование
+logger = telebot.logger
+telebot.logger.setLevel(logging.DEBUG)
 
 
 REPLY_START = 'Привет, ты написал боту опроса соискателей\n'\
@@ -27,6 +32,7 @@ REPLY_POLL = 'тут будет опрос'
 
 keyboard1 = telebot.types.ReplyKeyboardMarkup(True, True)
 keyboard1.row('узнать функционал', 'начать опрос')
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -44,7 +50,7 @@ def start_message(message):
 def first_question(message):
     question = 'вопрос 1 из 3: Укажите вакансию, на которую Вы претендовали';
     keyboard = telebot.types.InlineKeyboardMarkup();  # наша клавиатура
-    key_1_1 = telebot.types.InlineKeyboardButton(text='Операционист-кассир', callback_data='1.1');  # кнопка «Да»
+    key_1_1 = telebot.types.InlineKeyboardButton(text='Операционист-кассир'.encode('cp1251'), callback_data='1.1');  # кнопка «Да»
     keyboard.add(key_1_1);  # добавляем кнопку в клавиатуру
     key_1_2 = telebot.types.InlineKeyboardButton(text='Кредитный специалист', callback_data='1.2');
     keyboard.add(key_1_2);
@@ -222,15 +228,5 @@ def send_text(message):
     elif message.text.lower()=='начать опрос':
         start_message(message)
 
-#
-# @bot.message_handler(content_types=['text'])
-# def send_text(message):
-#     keyboard = telebot.types.InlineKeyboardMarkup(); #наша клавиатура
-#     key_yes = telebot.types.InlineKeyboardButton(text='Да', callback_data='yes'); #кнопка «Да»
-#     keyboard.add(key_yes); #добавляем кнопку в клавиатуру
-#     key_no= telebot.types.InlineKeyboardButton(text='Нет', callback_data='no');
-#     keyboard.add(key_no);
-#     question = 'выбери';
-#     bot.send_message(message.from_user.id, text=question, reply_markup=keyboard)
 
 bot.polling(none_stop=True, interval=0)
