@@ -26,13 +26,18 @@
 
 </xml>
 
-
 <xml>
 
-    усправление мультипроцессингом
+    запуск приложения
     heroku ps:scale worker=1 -a hr-telegram-poll-bot
 
 </xml>
 
+<xml>
+
+    остановка приложения
+    heroku ps:scale worker=0 -a hr-telegram-poll-bot
+
+</xml>
 
 @author: vndanilchenko@gmail.com
