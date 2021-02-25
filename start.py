@@ -50,7 +50,7 @@ def start_message(message):
 def first_question(message):
     question = 'вопрос 1 из 3: Укажите вакансию, на которую Вы претендовали';
     keyboard = telebot.types.InlineKeyboardMarkup();  # наша клавиатура
-    key_1_1 = telebot.types.InlineKeyboardButton(text='Операционист-кассир'.encode('cp1251'), callback_data='1.1');  # кнопка «Да»
+    key_1_1 = telebot.types.InlineKeyboardButton(text='Операционист-кассир', callback_data='1.1');  # кнопка «Да»
     keyboard.add(key_1_1);  # добавляем кнопку в клавиатуру
     key_1_2 = telebot.types.InlineKeyboardButton(text='Кредитный специалист', callback_data='1.2');
     keyboard.add(key_1_2);
