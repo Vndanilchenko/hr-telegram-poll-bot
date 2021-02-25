@@ -8,6 +8,7 @@
 
 import telebot, os
 import logging
+import sqlite3, json, io
 
 # импортируем токены
 try:
@@ -50,6 +51,10 @@ respone_1 = ''
 respone_2 = ''
 respone_3 = ''
 
+# настройки in memory бд
+conn = sqlite3.connect(":memory:", check_same_thread=False)
+cursor = conn.cursor()
+
 keyboard1 = telebot.types.ReplyKeyboardMarkup(True, True)
 keyboard1.row('узнать функционал', 'начать опрос')
 
@@ -64,10 +69,29 @@ def whatyoucando(message):
     bot.send_message(message.chat.id, REPLY_WHOIS)
 
 
-# начать опрос
 
+def check_user_data(message):
+    sql = "SELECT * FROM users where chatid={}".format(message.chat.id)
+    cursor.execute(sql)
+    data = cursor.fetchone()  # or use fetchone()
+    print(data)
+    # if data.shape[0]==0:
+    #     cursor.executemany("INSERT INTO users VALUES (?,?,?,?)", data)
+    # except Exception:
+    #     # data = await get_data()
+    #     # cursor.execute("CREATE TABLE users (chatid INTEGER , name TEXT, click INTEGER, state INTEGER)")
+    #     cursor.executemany("INSERT INTO users VALUES (?,?,?,?)", data)
+    #     conn.commit()
+    #     sql = "SELECT * FROM users where chatid={}".format(message.chat.id)
+    #     cursor.execute(sql)
+    #     data = cursor.fetchone()  # or use fetchone()
+
+# начать опрос
 @bot.message_handler(commands=['startpoll'])
 def first_question(message):
+
+    check_user_data(message)
+
     question = 'вопрос 1 из 3: Укажите вакансию, на которую Вы претендовали';
     keyboard = telebot.types.InlineKeyboardMarkup();  # наша клавиатура
     key_1_1 = telebot.types.InlineKeyboardButton(text='Операционист-кассир', callback_data='1.1');  # кнопка «Да»
@@ -189,8 +213,33 @@ def final_message(chat_id, final=False):
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     global FLAG_ELSE_REASON, comment, comment_else
-    if message.text.lower()=='admin' and str(message.from_user.id)==admin_id:
-        print('admin in da house')
+    if message.text.lower()=='admin create db' and str(message.from_user.id)==admin_id:
+        cursor.execute("SELECT * FROM users ")
+        data = cursor.fetchall()
+        if len(data)==0:
+            cursor.execute("CREATE TABLE users (chatid INTEGER, response_1 TEXT, response_2 TEXT, response_3 TEXT, "
+                           "comment_else TEXT, comment TEXT);")
+            cursor.execute("INSERT INTO users VALUES (123, 'resp1', 'resp2', 'resp3', 'comment_else', 'comment');")
+                           # "INSERT INTO users VALUES ({}, {}, {}, {}, {}, {})".format(str(message.from_user.id), 'test_response_1',\
+                           #                                                                'test_response_2', 'test_response_3',\
+                           #                                                                'test_comment_else', 'test_comment_total',))
+            # cursor.execute("INSERT INTO users VALUES ({}, {}, {}, {}, {}, {});".format(str(message.from_user.id), 'response_1',
+            #                                                                               'response_2', 'response_3',
+            #                                                                               'comment_else', 'comment_total'))
+            conn.commit()
+            print('database is created')
+            bot.send_message(message.from_user.id, 'database is created')
+        else:
+            print('database is created')
+            bot.send_message(message.from_user.id, 'database exists')
+    elif message.text.lower() == 'admin export db' and str(message.from_user.id) == admin_id:
+        cursor.execute("SELECT * FROM users ")
+        data = cursor.fetchall()
+        str_data = json.dumps(data)
+        bot.send_document(message.chat.id, io.StringIO(str_data))
+        # bot.send_message(message.chat.id, 'admin_id = {}'.format(message.chat.id))
+        # bot.send_message(message.chat.id, 'config_id = {}'.format(message.message_id + 1))
+        print('database is exported')
     if message.text.lower()=='узнать функционал':
         bot.send_message(message.chat.id, REPLY_START)
     elif message.text.lower()=='начать опрос':
