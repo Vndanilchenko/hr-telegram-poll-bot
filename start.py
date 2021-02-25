@@ -15,6 +15,13 @@ try:
 except:
     from private.token import token
 
+
+# импортируем id админа
+try:
+    token = os.environ['TG_ADMIN_ID']
+except:
+    from private.token import admin_id
+
 bot = telebot.TeleBot(token=token)
 
 # добавим логирование
@@ -39,9 +46,9 @@ comment = ''
 # запишем комментарий на причину "другое" отказа от позиции
 comment_else = ''
 # ответы
-respone_1 = 0
-respone_2 = 0
-respone_3 = 0
+respone_1 = ''
+respone_2 = ''
+respone_3 = ''
 
 keyboard1 = telebot.types.ReplyKeyboardMarkup(True, True)
 keyboard1.row('узнать функционал', 'начать опрос')
@@ -158,17 +165,14 @@ def callback_worker(call):
     # call.data это callback_data, которую мы указали при объявлении кнопки
     if call.data[0]=='1':
         respone_1 = call.data
-        print(respone_1)
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
         second_question(call)
     elif call.data[0]=='2':
         respone_2 = call.data
-        print(respone_2)
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
         third_question(call)
     elif call.data[0]=='3':
         respone_3 = call.data
-        print(respone_3)
         if call.data == "3.9":
             FLAG_ELSE_REASON = 1
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
@@ -177,7 +181,6 @@ def callback_worker(call):
             final_message(call.message.chat.id, True)
 
 def final_message(chat_id, final=False):
-    print(respone_1)
     # bot.send_message(chat_id, ('ваши ответы: ', respone_1, respone_2, respone_3, comment_else, comment))
     bot.send_message(chat_id, 'ваши ответы: ' + respone_1 + ' | ' + respone_2 + ' | ' + respone_3 + ' | ' + comment_else + ' | ' + comment)
     if final:
@@ -186,7 +189,8 @@ def final_message(chat_id, final=False):
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     global FLAG_ELSE_REASON, comment, comment_else
-    print(message.from_user.id)
+    if message.text.lower()=='admin' and str(message.from_user.id)==admin_id:
+        print('admin in da house')
     if message.text.lower()=='узнать функционал':
         bot.send_message(message.chat.id, REPLY_START)
     elif message.text.lower()=='начать опрос':
@@ -194,7 +198,6 @@ def send_text(message):
     elif FLAG_ELSE_REASON == 1:
         comment_else = message.text
         bot.send_message(message.chat.id, message.text)
-        print('FLAG_ELSE_REASON', FLAG_ELSE_REASON)
         FLAG_ELSE_REASON = 2
     elif FLAG_ELSE_REASON == 2:
         comment += message.text + ';'
