@@ -30,11 +30,12 @@ logger = telebot.logger
 telebot.logger.setLevel(logging.DEBUG)
 
 
-REPLY_START = 'Привет, ты написал боту опроса соискателей\n'\
-              '- узнать о функционале бота /whatyoucando\n' \
-              '- пройти опрос /startpoll'
+REPLY_START = 'Привет, ранее ты откликался на позицию, мы хотим узнать твое мнение о процессе подбора \n'\
+              '/startpoll - пройти опрос \n' \
+              '/whatyoucando - узнать о функционале бота \n' \
 
-REPLY_WHOIS = 'я могу выполнить опрос по заранее заготовленному шаблону, если хочешь попроовать, жми /startpoll'
+
+REPLY_WHOIS = 'я могу выполнить опрос по заранее заготовленному шаблону, если согласен принять участие, жми /startpoll'
 
 REPLY_POLL = 'тут будет опрос'
 
@@ -47,9 +48,12 @@ comment = ''
 # запишем комментарий на причину "другое" отказа от позиции
 comment_else = ''
 # ответы
-respone_1 = ''
-respone_2 = ''
-respone_3 = ''
+response_1 = ''
+response_2 = ''
+response_3 = ''
+username = ''
+first_name = ''
+last_name = ''
 
 # настройки in memory бд
 conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -71,20 +75,17 @@ def whatyoucando(message):
 
 
 def check_user_data(message):
-    sql = "SELECT * FROM users where chatid={}".format(message.chat.id)
-    cursor.execute(sql)
-    data = cursor.fetchone()  # or use fetchone()
+    global username, first_name, last_name
+    cursor.execute("SELECT * FROM users where chatid={}".format(message.chat.id))
+    data = cursor.fetchone()
+    if data:
+        username, first_name, last_name, \
+         response_1, response_2, response_3, comment_else, comment = data[1:]
+    else:
+        username = message.from_user['username']
+        first_name = message.from_user['first_name']
+        last_name = message.from_user['last_name']
     print(data)
-    # if data.shape[0]==0:
-    #     cursor.executemany("INSERT INTO users VALUES (?,?,?,?)", data)
-    # except Exception:
-    #     # data = await get_data()
-    #     # cursor.execute("CREATE TABLE users (chatid INTEGER , name TEXT, click INTEGER, state INTEGER)")
-    #     cursor.executemany("INSERT INTO users VALUES (?,?,?,?)", data)
-    #     conn.commit()
-    #     sql = "SELECT * FROM users where chatid={}".format(message.chat.id)
-    #     cursor.execute(sql)
-    #     data = cursor.fetchone()  # or use fetchone()
 
 # начать опрос
 @bot.message_handler(commands=['startpoll'])
@@ -92,6 +93,7 @@ def first_question(message):
 
     check_user_data(message)
 
+    print(message.from_user)
     question = 'вопрос 1 из 3: Укажите вакансию, на которую Вы претендовали';
     keyboard = telebot.types.InlineKeyboardMarkup();  # наша клавиатура
     key_1_1 = telebot.types.InlineKeyboardButton(text='Операционист-кассир', callback_data='1.1');  # кнопка «Да»
@@ -184,19 +186,19 @@ def third_question(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    global respone_1, respone_2, respone_3, FLAG_END_POLL, FLAG_ELSE_REASON
+    global response_1, response_2, response_3, FLAG_END_POLL, FLAG_ELSE_REASON
     # сделаем отдельную обработку на каждый блок вопросов
     # call.data это callback_data, которую мы указали при объявлении кнопки
     if call.data[0]=='1':
-        respone_1 = call.data
+        response_1 = call.data
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
         second_question(call)
     elif call.data[0]=='2':
-        respone_2 = call.data
+        response_2 = call.data
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
         third_question(call)
     elif call.data[0]=='3':
-        respone_3 = call.data
+        response_3 = call.data
         if call.data == "3.9":
             FLAG_ELSE_REASON = 1
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
@@ -205,33 +207,34 @@ def callback_worker(call):
             final_message(call.message.chat.id, True)
 
 def final_message(chat_id, final=False):
-    # bot.send_message(chat_id, ('ваши ответы: ', respone_1, respone_2, respone_3, comment_else, comment))
-    bot.send_message(chat_id, 'ваши ответы: ' + respone_1 + ' | ' + respone_2 + ' | ' + respone_3 + ' | ' + comment_else + ' | ' + comment)
+    cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
+                   (chat_id, username, first_name, last_name, \
+                    response_1, response_2, response_3, comment_else, comment))
+    conn.commit()
+    bot.send_message(chat_id, 'ваши ответы: ' + response_1 + ' | ' + response_2 + ' | ' + response_3 + ' | ' + comment_else + ' | ' + comment)
     if final:
         bot.send_message(chat_id, 'спасибо за уделенное время, вы помогаете нашим сервисам стать лучше');
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    global FLAG_ELSE_REASON, comment, comment_else
+    global FLAG_ELSE_REASON, comment, comment_else, response_1, response_2, response_3
     if message.text.lower()=='admin create db' and str(message.from_user.id)==admin_id:
-        cursor.execute("SELECT * FROM users ")
-        data = cursor.fetchall()
-        if len(data)==0:
-            cursor.execute("CREATE TABLE users (chatid INTEGER, response_1 TEXT, response_2 TEXT, response_3 TEXT, "
-                           "comment_else TEXT, comment TEXT);")
-            cursor.execute("INSERT INTO users VALUES (123, 'resp1', 'resp2', 'resp3', 'comment_else', 'comment');")
-                           # "INSERT INTO users VALUES ({}, {}, {}, {}, {}, {})".format(str(message.from_user.id), 'test_response_1',\
-                           #                                                                'test_response_2', 'test_response_3',\
-                           #                                                                'test_comment_else', 'test_comment_total',))
-            # cursor.execute("INSERT INTO users VALUES ({}, {}, {}, {}, {}, {});".format(str(message.from_user.id), 'response_1',
-            #                                                                               'response_2', 'response_3',
-            #                                                                               'comment_else', 'comment_total'))
-            conn.commit()
-            print('database is created')
-            bot.send_message(message.from_user.id, 'database is created')
-        else:
-            print('database is created')
-            bot.send_message(message.from_user.id, 'database exists')
+        try:
+            cursor.execute("drop table users;")
+        except:
+            pass
+        cursor.execute("CREATE TABLE users (chatid INTEGER, username TEXT, first_name TEXT, last_name TEXT, "
+                       "response_1 TEXT, response_2 TEXT, response_3 TEXT, comment_else TEXT, comment TEXT);")
+
+        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
+                       (str(message.from_user.id), username, first_name, last_name, \
+                       response_1, response_2, response_3, comment_else, comment))
+        conn.commit()
+        print('database is created')
+        bot.send_message(message.from_user.id, 'database is created')
+        # else:
+        #     print('database is created')
+        #     bot.send_message(message.from_user.id, 'database exists')
     elif message.text.lower() == 'admin export db' and str(message.from_user.id) == admin_id:
         cursor.execute("SELECT * FROM users ")
         data = cursor.fetchall()
@@ -241,7 +244,7 @@ def send_text(message):
         # bot.send_message(message.chat.id, 'config_id = {}'.format(message.message_id + 1))
         print('database is exported')
     if message.text.lower()=='узнать функционал':
-        bot.send_message(message.chat.id, REPLY_START)
+        bot.send_message(message.chat.id, REPLY_WHOIS)
     elif message.text.lower()=='начать опрос':
         first_question(message)
     elif FLAG_ELSE_REASON == 1:
