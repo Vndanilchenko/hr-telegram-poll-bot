@@ -44,16 +44,17 @@ FLAG_END_POLL = 0
 # если флаг=1, значит клиент выбрал из причин "другое" и далее мы будем считать его текст комментарием к вопросу
 FLAG_ELSE_REASON = 0
 # будем заполнять эту переменную всеми фразами клиента, когда FLAG_ELSE_REASON!=1
-comment = ''
+comment = str()
 # запишем комментарий на причину "другое" отказа от позиции
-comment_else = ''
+comment_else = str()
 # ответы
-response_1 = ''
-response_2 = ''
-response_3 = ''
-username = ''
-first_name = ''
-last_name = ''
+response_1 = str()
+response_2 = str()
+response_3 = str()
+username = str()
+first_name = str()
+last_name = str()
+cnt_msg = 0
 
 # настройки in memory бд
 conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -74,18 +75,7 @@ def whatyoucando(message):
 
 
 
-def check_user_data(message):
-    global username, first_name, last_name
-    cursor.execute("SELECT * FROM users where chatid={}".format(message.chat.id))
-    data = cursor.fetchone()
-    if data:
-        username, first_name, last_name, \
-         response_1, response_2, response_3, comment_else, comment = data[1:]
-    else:
-        username = message.from_user['username']
-        first_name = message.from_user['first_name']
-        last_name = message.from_user['last_name']
-    print(data)
+
 
 # начать опрос
 @bot.message_handler(commands=['startpoll'])
@@ -203,40 +193,75 @@ def callback_worker(call):
             FLAG_ELSE_REASON = 1
         bot.send_message(call.message.chat.id, 'выбран вариант: ' + call.data);
         FLAG_END_POLL = 1
-        if not FLAG_ELSE_REASON:
-            final_message(call.message.chat.id, True)
+    final_message(call.message.chat.id, FLAG_ELSE_REASON)
+
+
+
+
+
+def check_table(chat_id):
+    try:
+        cursor.execute("SELECT * FROM users ")
+    except:
+        cursor.execute("CREATE TABLE users (chatid INTEGER, username TEXT, first_name TEXT, last_name TEXT, " \
+                       "response_1 TEXT, response_2 TEXT, response_3 TEXT, comment_else TEXT, comment TEXT);")
+        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
+                       (str(chat_id), username, first_name, last_name, \
+                       response_1, response_2, response_3, comment_else, comment))
+        print("table is created")
+
+def check_user_data(message):
+    global username, first_name, last_name
+    try:
+        cursor.execute("SELECT * FROM users where chatid={}".format(message.chat.id))
+    except:
+        check_table(message.chat.id)
+    data = cursor.fetchone()
+    if data:
+        username, first_name, last_name, \
+         response_1, response_2, response_3, comment_else, comment = data[1:]
+    else:
+        username = message.from_user['username']
+        first_name = message.from_user['first_name']
+        last_name = message.from_user['last_name']
+    print(data)
 
 def final_message(chat_id, final=False):
-    cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
-                   (chat_id, username, first_name, last_name, \
-                    response_1, response_2, response_3, comment_else, comment))
+    check_table(chat_id)
+    # cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
+    #                (chat_id, username, first_name, last_name, \
+    #                 response_1, response_2, response_3, comment_else, comment))
+    cursor.execute("UPDATE users SET username=?, first_name=?, last_name=?, response_1=?, response_2=?, response_3=?, " \
+                   "comment_else=?, comment=? WHERE chatid=?", \
+                   (username, first_name, last_name, \
+                    response_1, response_2, response_3, comment_else, comment, chat_id))
+    print("table is updated")
     conn.commit()
     bot.send_message(chat_id, 'ваши ответы: ' + response_1 + ' | ' + response_2 + ' | ' + response_3 + ' | ' + comment_else + ' | ' + comment)
     if final:
         bot.send_message(chat_id, 'спасибо за уделенное время, вы помогаете нашим сервисам стать лучше');
 
+
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     global FLAG_ELSE_REASON, comment, comment_else, response_1, response_2, response_3
     if message.text.lower()=='admin create db' and str(message.from_user.id)==admin_id:
-        try:
-            cursor.execute("drop table users;")
-        except:
-            pass
-        cursor.execute("CREATE TABLE users (chatid INTEGER, username TEXT, first_name TEXT, last_name TEXT, "
-                       "response_1 TEXT, response_2 TEXT, response_3 TEXT, comment_else TEXT, comment TEXT);")
+        check_table(message.chat.id)
 
-        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
-                       (str(message.from_user.id), username, first_name, last_name, \
-                       response_1, response_2, response_3, comment_else, comment))
         conn.commit()
         print('database is created')
         bot.send_message(message.from_user.id, 'database is created')
         # else:
         #     print('database is created')
         #     bot.send_message(message.from_user.id, 'database exists')
+    elif message.text.lower() == 'admin drop db' and str(message.from_user.id) == admin_id:
+        try:
+            cursor.execute("drop table users;")
+        except:
+            pass
+        bot.send_message(message.from_user.id, 'database is droped')
     elif message.text.lower() == 'admin export db' and str(message.from_user.id) == admin_id:
-        cursor.execute("SELECT * FROM users ")
+        final_message(message.chat.id)
         data = cursor.fetchall()
         str_data = json.dumps(data)
         bot.send_document(message.chat.id, io.StringIO(str_data))
@@ -251,6 +276,7 @@ def send_text(message):
         comment_else = message.text
         bot.send_message(message.chat.id, message.text)
         FLAG_ELSE_REASON = 2
+        final_message(message.chat.id)
     elif FLAG_ELSE_REASON == 2:
         comment += message.text + ';'
         bot.send_message(message.chat.id, "мы учтем ваш комментарий: " + message.text)
