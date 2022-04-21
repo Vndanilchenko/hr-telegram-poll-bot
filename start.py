@@ -202,12 +202,17 @@ def callback_worker(call):
 def check_table(chat_id):
     try:
         cursor.execute("SELECT * FROM users ")
+        print("table exists")
     except:
         cursor.execute("CREATE TABLE users (chatid INTEGER, username TEXT, first_name TEXT, last_name TEXT, " \
-                       "response_1 TEXT, response_2 TEXT, response_3 TEXT, comment_else TEXT, comment TEXT);")
-        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
-                       (str(chat_id), username, first_name, last_name, \
-                       response_1, response_2, response_3, comment_else, comment))
+                       "response_1 TEXT, response_2 TEXT, response_3 TEXT, comment_else varchar, comment TEXT);")
+        # cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", \
+        #                (str(chat_id), username, first_name, last_name, \
+        #                response_1, response_2, response_3, comment_else, comment))
+        # cursor.execute("INSERT INTO users VALUES (?, ?)" ,(chat_id, str(username)))
+        cursor.execute("INSERT INTO users VALUES (?,?,?,?,?,?,?,?,?)" , (chat_id, username, first_name, last_name, response_1, response_2, response_3, str(comment_else), comment))
+        # cursor.execute("INSERT INTO users VALUES (%d, %s, %s, %s, %s, %s, %s, %s, %s )" % (chat_id, username, first_name, last_name, response_1, response_2, response_3, comment_else, comment))
+        conn.commit()
         print("table is created")
 
 def check_user_data(message):
@@ -234,7 +239,11 @@ def final_message(chat_id, final=False):
     cursor.execute("UPDATE users SET username=?, first_name=?, last_name=?, response_1=?, response_2=?, response_3=?, " \
                    "comment_else=?, comment=? WHERE chatid=?", \
                    (username, first_name, last_name, \
-                    response_1, response_2, response_3, comment_else, comment, chat_id))
+                    response_1, response_2, response_3, str(comment_else), comment, chat_id))
+    # cursor.execute("UPDATE users SET username=%s, first_name=%s, last_name=%s, response_1=%s, response_2=%s, response_3=%s,"  \
+    #                "comment_else=%s, comment=%s WHERE chatid=%" % \
+    #                (username, first_name, last_name, \
+    #                 response_1, response_2, response_3, comment_else, comment, chat_id))
     print("table is updated")
     conn.commit()
     bot.send_message(chat_id, 'ваши ответы: ' + response_1 + ' | ' + response_2 + ' | ' + response_3 + ' | ' + comment_else + ' | ' + comment)
